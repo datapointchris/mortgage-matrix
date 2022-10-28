@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "mortgage-matrix"
+version = "0.1.0"
+description = ""
+authors = ["Chris Birch <datapointchris@gmail.com>"]
+readme = "README.md"
+packages = [{include = "mortgage_matrix"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.16.2"
+black = "^22.10.0"
+flake8 = "^5.0.4"
+pytest = "^7.2.0"
+tools = {git = "https://github.com/datapointchris/tools.git"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
