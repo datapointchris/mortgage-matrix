@@ -32,20 +32,22 @@ class MortgageSummaryItem:
 class Mortgage:
     DOLLAR_QUANTIZE = decimal.Decimal('.01')
     MONTHS_PER_YEAR = 12
+    PMI = 0.0058
+    HOME_INSURNACE_YEARLY = 2000
 
     def __init__(
         self,
-        purchase_amount: int,
+        purchase_price: int,
         percent_down: int,
         interest_rate: float,
         years: int,
         utility_cost_percentage: float,
         property_tax_percentage: float,
     ):
-        self.purchase_amount = self.dollar(purchase_amount)
+        self.purchase_amount = self.dollar(purchase_price)
         self.percent_down = self.percentage(percent_down)
         self.down_payment = self.purchase_amount * self.percent_down
-        self.loan_amount = self.dollar(purchase_amount * (1 - self.percent_down))
+        self.loan_amount = self.dollar(purchase_price * (1 - self.percent_down))
         self.interest_rate = self.percentage(interest_rate)
         self.years = decimal.Decimal(years)
         self.months = decimal.Decimal(years * self.MONTHS_PER_YEAR)
@@ -74,6 +76,12 @@ class Mortgage:
         return self.years
 
     @property
+    def monthly_payment(self):
+        interest = self.loan_amount * self.interest_rate
+        pre_amt = interest / (self.MONTHS_PER_YEAR * (1 - (1 / self.month_growth) ** self.months))
+        return self.dollar(pre_amt, rounding=decimal.ROUND_CEILING)
+
+    @property
     def monthly_utilities(self):
         return self.monthly_payment * self.utility_cost_percentage
 
@@ -82,14 +90,20 @@ class Mortgage:
         return self.monthly_payment * self.property_tax_percentage
 
     @property
-    def month_growth(self):
-        return 1 + self.interest_rate / self.MONTHS_PER_YEAR
+    def monthly_home_insurnace(self):
+        return self.HOME_INSURNACE_YEARLY / self.MONTHS_PER_YEAR
 
     @property
-    def monthly_payment(self):
-        interest = self.loan_amount * self.interest_rate
-        pre_amt = interest / (self.MONTHS_PER_YEAR * (1 - (1 / self.month_growth) ** self.months))
-        return self.dollar(pre_amt, rounding=decimal.ROUND_CEILING)
+    def monthly_pmi(self):
+        return self.loan_amount * decimal.Decimal(self.PMI) / self.MONTHS_PER_YEAR
+
+    @property
+    def total_monthly_payment(self):
+        return self.monthly_payment + self.monthly_utilities + self.monthly_property_tax + self.monthly_pmi
+
+    @property
+    def month_growth(self):
+        return 1 + self.interest_rate / self.MONTHS_PER_YEAR
 
     @property
     def total_value(self):
@@ -117,7 +131,9 @@ class Mortgage:
             payment = balance + interest if self.monthly_payment >= balance + interest else self.monthly_payment
             utilities = self.monthly_utilities
             property_tax = self.monthly_property_tax
-            total_monthly_payment = payment + utilities + property_tax
+            insurance = self.monthly_home_insurnace
+            pmi = self.monthly_pmi if (balance / self.purchase_amount > 0.78) else 0
+            total_monthly_payment = payment + utilities + property_tax + insurance + pmi
             schedule.append(
                 [
                     PaymentPeriodItem('Period', period, '.0f'),
@@ -127,6 +143,8 @@ class Mortgage:
                     PaymentPeriodItem('Interest', float(interest), '.2f'),
                     PaymentPeriodItem('Utilities', float(utilities), '.2f'),
                     PaymentPeriodItem('Property Tax', float(property_tax), '.2f'),
+                    PaymentPeriodItem('Insurance', float(insurance), '.2f'),
+                    PaymentPeriodItem('Personal Mortgage Insurance', float(pmi), '.2f'),
                     PaymentPeriodItem('Total Monthly Payment', float(total_monthly_payment), '.2f'),
                 ]
             )
@@ -137,6 +155,7 @@ class Mortgage:
     def summary(self) -> list[MortgageSummaryItem]:
         return [
             MortgageSummaryItem('Purchase Amount', self.purchase_amount, '.2f'),
+            MortgageSummaryItem('Percent Down', self.percent_down, '.2%'),
             MortgageSummaryItem('Down Payment', self.down_payment, '.2f'),
             MortgageSummaryItem('Loan Amount', self.loan_amount, '.2f'),
             MortgageSummaryItem('Rate', self.interest_rate, '.2%'),
@@ -144,6 +163,9 @@ class Mortgage:
             MortgageSummaryItem('Monthly Payment', self.monthly_payment, '.2f'),
             MortgageSummaryItem('Monthly Utility Cost', self.monthly_utilities, '.2f'),
             MortgageSummaryItem('Monthly Property Tax', self.monthly_property_tax, '.2f'),
+            MortgageSummaryItem('Monthly Home Insurance', self.monthly_home_insurnace, '.2f'),
+            MortgageSummaryItem('Personal Mortgage Insurance', self.monthly_pmi, '.2f'),
+            MortgageSummaryItem('Total Monthly Payment', self.total_monthly_payment, '.2f'),
             MortgageSummaryItem('Month Growth', self.month_growth, '.6f'),
             MortgageSummaryItem('Payoff Years', self.loan_years, '.0f'),
             MortgageSummaryItem('Payoff Months', self.months, '.0f'),
@@ -153,21 +175,6 @@ class Mortgage:
 
     def to_dict(self) -> dict:
         return {summ_item.name: round(float(summ_item.value), 4) for summ_item in self.summary}
-
-    def print_summary(self):
-        title = ' Mortgage Summary '
-        self.print_item(self.summary, title=title)
-
-    def print_payment_schedule(self, period=None, range=None):
-        title = ' Payment Schedule '
-        if period:
-            self.print_item(self.payment_schedule[period + -1], title=title)
-        elif range:
-            for schedule in self.payment_schedule[range[0] - 1:range[1]]:
-                self.print_item(schedule, title=title)
-        else:
-            for schedule in self.payment_schedule:
-                self.print_item(schedule, title=title)
 
     def print_item(self, items, title, top_border='-', bottom_border='=', label_pad=30, value_pad=12):
         width = label_pad + value_pad + 4
@@ -180,19 +187,34 @@ class Mortgage:
         print(bottom_border * width)
         print()
 
+    def print_summary(self):
+        title = ' Mortgage Summary '
+        self.print_item(self.summary, title=title)
+
+    def print_payment_schedule(self, period=None, range=None):
+        title = ' Payment Schedule '
+        if period:
+            self.print_item(self.payment_schedule[period + -1], title=title)
+        elif range:
+            for schedule in self.payment_schedule[range[0] - 1 : range[1]]:
+                self.print_item(schedule, title=title)
+        else:
+            for schedule in self.payment_schedule:
+                self.print_item(schedule, title=title)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Mortgage Amortization Tools')
-    parser.add_argument('--purchase-amount', default=250_000)
-    parser.add_argument('--percent-down', default=10)
-    parser.add_argument('--interest-rate', default=5)
-    parser.add_argument('--years', default=30)
-    parser.add_argument('--utility-cost', default=15)
+    parser.add_argument('--purchase-price', default=300000, type=int)
+    parser.add_argument('--percent-down', default=5, type=int)
+    parser.add_argument('--interest-rate', default=5, type=int)
+    parser.add_argument('--years', default=30, type=int)
+    parser.add_argument('--utility-cost', default=20)
     parser.add_argument('--property-tax', default=1.25)
     args = parser.parse_args()
 
     m = Mortgage(
-        purchase_amount=args.purchase_amount,
+        purchase_price=args.purchase_price,
         percent_down=args.percent_down,
         interest_rate=args.interest_rate,
         years=args.years,
@@ -202,9 +224,9 @@ def main():
 
     m.print_summary()
 
-    m.print_payment_schedule(period=3)
-    
-    m.print_payment_schedule(range=(300, 304))
+    # m.print_payment_schedule(period=3)
+
+    # m.print_payment_schedule(range=(300, 304))
 
 
 if __name__ == '__main__':
