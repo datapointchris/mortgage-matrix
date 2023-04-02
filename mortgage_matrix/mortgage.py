@@ -1,6 +1,7 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 import argparse
 import decimal
+from typing import List
 
 
 @dataclass
@@ -33,7 +34,7 @@ class Mortgage:
     DOLLAR_QUANTIZE = decimal.Decimal('.01')
     MONTHS_PER_YEAR = 12
     PMI = 0.0058
-    HOME_INSURNACE_YEARLY = 2000
+    HOME_INSURNACE_YEARLY = decimal.Decimal(2000)
 
     def __init__(
         self,
@@ -117,10 +118,18 @@ class Mortgage:
 
     @property
     def total_payout(self):
-        return self.monthly_payment * self.months
+        return self.monthly_payment * self.months + self.down_payment
 
     @property
-    def payment_schedule(self) -> list[PaymentPeriod]:
+    def cost_over_purchase_amount(self):
+        return self.total_payout - self.purchase_amount
+
+    @property
+    def percent_over_purchase_amount(self):
+        return self.cost_over_purchase_amount / self.purchase_amount
+
+    @property
+    def payment_schedule(self) -> List[PaymentPeriod]:
         balance = self.dollar(self.loan_amount)
         rate = decimal.Decimal(str(self.interest_rate)).quantize(decimal.Decimal('.000001'))
         schedule = []
@@ -152,25 +161,27 @@ class Mortgage:
         return schedule
 
     @property
-    def summary(self) -> list[MortgageSummaryItem]:
+    def summary(self) -> List[MortgageSummaryItem]:
         return [
-            MortgageSummaryItem('Purchase Amount', self.purchase_amount, '.2f'),
-            MortgageSummaryItem('Percent Down', self.percent_down, '.2%'),
-            MortgageSummaryItem('Down Payment', self.down_payment, '.2f'),
-            MortgageSummaryItem('Loan Amount', self.loan_amount, '.2f'),
-            MortgageSummaryItem('Rate', self.interest_rate, '.2%'),
-            MortgageSummaryItem('APY', self.apy, '.6%'),
-            MortgageSummaryItem('Monthly Payment', self.monthly_payment, '.2f'),
-            MortgageSummaryItem('Monthly Utility Cost', self.monthly_utilities, '.2f'),
-            MortgageSummaryItem('Monthly Property Tax', self.monthly_property_tax, '.2f'),
-            MortgageSummaryItem('Monthly Home Insurance', self.monthly_home_insurnace, '.2f'),
-            MortgageSummaryItem('Personal Mortgage Insurance', self.monthly_pmi, '.2f'),
-            MortgageSummaryItem('Total Monthly Payment', self.total_monthly_payment, '.2f'),
-            MortgageSummaryItem('Month Growth', self.month_growth, '.6f'),
-            MortgageSummaryItem('Payoff Years', self.loan_years, '.0f'),
-            MortgageSummaryItem('Payoff Months', self.months, '.0f'),
-            MortgageSummaryItem('Annual Payment', self.annual_payment, '.2f'),
-            MortgageSummaryItem('Total Cost', self.total_payout, '.2f'),
+            MortgageSummaryItem('Purchase Amount', float(self.purchase_amount), '.2f'),
+            MortgageSummaryItem('Percent Down', float(self.percent_down), '.2%'),
+            MortgageSummaryItem('Down Payment', float(self.down_payment), '.2f'),
+            MortgageSummaryItem('Loan Amount', float(self.loan_amount), '.2f'),
+            MortgageSummaryItem('Rate', float(self.interest_rate), '.2%'),
+            MortgageSummaryItem('APY', float(self.apy), '.6%'),
+            MortgageSummaryItem('Monthly Payment', float(self.monthly_payment), '.2f'),
+            MortgageSummaryItem('Monthly Utility Cost', float(self.monthly_utilities), '.2f'),
+            MortgageSummaryItem('Monthly Property Tax', float(self.monthly_property_tax), '.2f'),
+            MortgageSummaryItem('Monthly Home Insurance', float(self.monthly_home_insurnace), '.2f'),
+            MortgageSummaryItem('Personal Mortgage Insurance', float(self.monthly_pmi), '.2f'),
+            MortgageSummaryItem('Total Monthly Payment', float(self.total_monthly_payment), '.2f'),
+            MortgageSummaryItem('Month Growth', float(self.month_growth), '.6f'),
+            MortgageSummaryItem('Payoff Years', float(self.loan_years), '.0f'),
+            MortgageSummaryItem('Payoff Months', float(self.months), '.0f'),
+            MortgageSummaryItem('Annual Payment', float(self.annual_payment), '.2f'),
+            MortgageSummaryItem('Total Cost', float(self.total_payout), '.2f'),
+            MortgageSummaryItem('Cost Over Purchase Price', float(self.cost_over_purchase_amount), '.2f'),
+            MortgageSummaryItem('Percent Over Purchase Price', float(self.percent_over_purchase_amount), '.2%'),
         ]
 
     def to_dict(self) -> dict:
