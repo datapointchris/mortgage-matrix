@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import argparse
 import decimal
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -202,12 +202,14 @@ class Mortgage:
         title = ' Mortgage Summary '
         self.print_item(self.summary, title=title)
 
-    def print_payment_schedule(self, period=None, range=None):
+    def print_payment_schedule(self, period: Optional[int] = None, period_range: Optional[tuple[int, int]] = None):
         title = ' Payment Schedule '
         if period:
-            self.print_item(self.payment_schedule[period + -1], title=title)
-        elif range:
-            for schedule in self.payment_schedule[range[0] - 1 : range[1]]:
+            self.print_item(self.payment_schedule[period - 1], title=title)
+        elif period_range:
+            start = period_range[0] - 1
+            end = period_range[1]
+            for schedule in self.payment_schedule[start:end]:
                 self.print_item(schedule, title=title)
         else:
             for schedule in self.payment_schedule:
