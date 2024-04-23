@@ -358,6 +358,8 @@ hs_err_pid*
 
 **/__pycache__
 
+TESTING.*
+
 # Scala stuff
 bin/
 target/
