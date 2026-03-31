@@ -381,3 +381,4 @@ build/
 *.iml
 *.ipr
 *.iws
+.planning/
